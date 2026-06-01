@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>肝機能障害 鑑別支援</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+JP:wght@400;500;600;700&family=IBM+Plex+Serif:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#f3efe6; --paper-2:#ece7da; --card:#faf8f2;
+    --ink:#1d201c; --ink-soft:#494f47; --muted:#8b8d80;
+    --line:#d7d1c2; --line-soft:#e3ddcf;
+    --teal:#106b5d; --teal-deep:#0a4a40; --teal-soft:#e2efe9;
+    --amber:#a96a12; --amber-soft:#f5ead3;
+    --crit:#a23223; --crit-soft:#f4e0da;
+    --ok:#3f7a4a;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    font-family:'IBM Plex Sans JP',sans-serif;
+    background:var(--paper);
+    color:var(--ink);
+    line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+    background-image:
+      radial-gradient(circle at 12% 8%, rgba(16,107,93,.04), transparent 40%),
+      radial-gradient(circle at 90% 92%, rgba(169,106,18,.04), transparent 45%);
+    min-height:100vh;
+  }
+  .wrap{max-width:1180px;margin:0 auto;padding:0 22px 80px}
+
+  /* Header */
+  header{padding:46px 0 26px;border-bottom:1.5px solid var(--ink);position:relative}
+  .kicker{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.28em;
+    text-transform:uppercase;color:var(--teal);font-weight:600;display:flex;
+    align-items:center;gap:10px;margin-bottom:14px}
+  .kicker::before{content:"";width:30px;height:1.5px;background:var(--teal);display:inline-block}
+  h1{font-family:'IBM Plex Serif',serif;font-weight:600;font-size:clamp(30px,5vw,46px);
+    line-height:1.08;letter-spacing:-.01em}
+  .sub{margin-top:12px;color:var(--ink-soft);font-size:15px;max-width:640px}
+
+  .disclaimer{margin-top:22px;display:flex;gap:12px;align-items:flex-start;
+    background:var(--amber-soft);border:1px solid #e3cfa3;border-left:4px solid var(--amber);
+    padding:12px 16px;border-radius:5px;font-size:12.5px;color:#6e4a0f;max-width:760px}
+  .disclaimer b{color:#5a3c0b}
+
+  /* Layout */
+  .grid{display:grid;grid-template-columns:minmax(0,420px) minmax(0,1fr);gap:34px;margin-top:34px}
+  @media(max-width:860px){.grid{grid-template-columns:1fr;gap:26px}}
+
+  /* Panel */
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:12px;
+    padding:24px 22px;box-shadow:0 1px 0 rgba(0,0,0,.02),0 14px 30px -22px rgba(40,40,30,.28)}
+  .panel-title{font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.16em;
+    text-transform:uppercase;color:var(--ink-soft);font-weight:600;
+    display:flex;justify-content:space-between;align-items:center;
+    padding-bottom:12px;border-bottom:1px solid var(--line);margin-bottom:18px}
+  .panel-title .num{color:var(--teal)}
+
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:7px;overflow:hidden;background:var(--paper-2)}
+  .seg button{font-family:inherit;font-size:12px;padding:5px 13px;border:none;background:transparent;
+    cursor:pointer;color:var(--ink-soft);font-weight:500;transition:.15s}
+  .seg button.on{background:var(--teal);color:#fff}
+
+  .field{display:grid;grid-template-columns:1fr 96px;gap:8px 12px;align-items:center;
+    padding:9px 0;border-bottom:1px dashed var(--line-soft)}
+  .field:last-child{border-bottom:none}
+  .field .lab{display:flex;flex-direction:column}
+  .field .lab .nm{font-size:14px;font-weight:500}
+  .field .lab .rg{font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--muted);margin-top:1px}
+  .field input{font-family:'IBM Plex Mono',monospace;font-size:15px;text-align:right;
+    width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:6px;background:#fff;
+    color:var(--ink);transition:.15s;-moz-appearance:textfield}
+  .field input::-webkit-outer-spin-button,.field input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+  .field input:focus{outline:none;border-color:var(--teal);box-shadow:0 0 0 3px var(--teal-soft)}
+  .field input.flag-hi{border-color:#d8a24a;background:#fdf7ec}
+  .field input.flag-lo{border-color:#7fa6c9;background:#eef4fa}
+
+  .grp-label{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.18em;
+    text-transform:uppercase;color:var(--teal);font-weight:600;margin:18px 0 4px;
+    display:flex;align-items:center;gap:8px}
+  .grp-label::after{content:"";flex:1;height:1px;background:var(--line-soft)}
+  .grp-label:first-of-type{margin-top:4px}
+
+  .btn-row{display:flex;gap:10px;margin-top:22px}
+  .btn{flex:1;font-family:inherit;font-weight:600;font-size:14px;padding:12px;border-radius:8px;
+    cursor:pointer;transition:.15s;border:1px solid transparent}
+  .btn-main{background:var(--ink);color:var(--paper)}
+  .btn-main:hover{background:var(--teal-deep)}
+  .btn-ghost{background:transparent;border-color:var(--line);color:var(--ink-soft);flex:0 0 auto;padding:12px 16px}
+  .btn-ghost:hover{border-color:var(--ink-soft)}
+
+  .presets{margin-top:16px}
+  .presets .pl{font-size:11px;color:var(--muted);margin-bottom:8px;font-family:'IBM Plex Mono',monospace;letter-spacing:.1em}
+  .chips{display:flex;flex-wrap:wrap;gap:7px}
+  .chip{font-size:11.5px;padding:5px 11px;border:1px solid var(--line);border-radius:20px;
+    background:var(--paper-2);cursor:pointer;color:var(--ink-soft);transition:.15s}
+  .chip:hover{border-color:var(--teal);color:var(--teal);background:#fff}
+
+  /* Results */
+  .results{min-height:200px}
+  .empty{display:flex;flex-direction:column;align-items:center;justify-content:center;
+    text-align:center;padding:70px 20px;color:var(--muted);border:1.5px dashed var(--line);
+    border-radius:12px;height:100%}
+  .empty svg{margin-bottom:14px;opacity:.4}
+
+  .pattern{border-radius:12px;padding:22px 24px;color:#fff;margin-bottom:22px;position:relative;overflow:hidden}
+  .pattern.hep{background:linear-gradient(135deg,#0a4a40,#106b5d)}
+  .pattern.chol{background:linear-gradient(135deg,#7a4a0d,#a96a12)}
+  .pattern.mix{background:linear-gradient(135deg,#3a4a6e,#4f6391)}
+  .pattern.bili{background:linear-gradient(135deg,#6e3a52,#9a4f73)}
+  .pattern.none{background:linear-gradient(135deg,#4a4f47,#6a6f63)}
+  .pattern .pk{font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.22em;
+    text-transform:uppercase;opacity:.75;margin-bottom:6px}
+  .pattern .pt-name{font-family:'IBM Plex Serif',serif;font-size:27px;font-weight:600;line-height:1.1}
+  .pattern .pt-desc{font-size:13px;opacity:.9;margin-top:8px;max-width:90%}
+  .readouts{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}
+  .ro{background:rgba(255,255,255,.14);border-radius:7px;padding:8px 12px;backdrop-filter:blur(2px)}
+  .ro .rl{font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.12em;opacity:.8;text-transform:uppercase}
+  .ro .rv{font-family:'IBM Plex Mono',monospace;font-size:18px;font-weight:600;margin-top:2px}
+
+  .sec-h{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.16em;text-transform:uppercase;
+    color:var(--ink-soft);font-weight:600;margin:24px 0 12px;display:flex;align-items:center;gap:10px}
+  .sec-h .ct{margin-left:auto;color:var(--muted);font-weight:400}
+
+  .dx{background:var(--card);border:1px solid var(--line);border-radius:11px;padding:17px 19px;margin-bottom:13px;
+    position:relative;transition:.2s}
+  .dx.top{border-color:var(--teal);box-shadow:0 8px 24px -16px rgba(16,107,93,.5)}
+  .dx-head{display:flex;align-items:baseline;gap:11px;margin-bottom:4px}
+  .dx-rank{font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:600;color:var(--teal);min-width:24px}
+  .dx-name{font-family:'IBM Plex Serif',serif;font-size:19px;font-weight:600}
+  .dx-cat{font-size:10.5px;font-family:'IBM Plex Mono',monospace;color:var(--muted);margin-left:auto;
+    border:1px solid var(--line);padding:2px 8px;border-radius:5px;white-space:nowrap}
+  .like{height:5px;background:var(--line-soft);border-radius:3px;overflow:hidden;margin:10px 0 13px}
+  .like span{display:block;height:100%;background:linear-gradient(90deg,var(--teal),#1f9a85);border-radius:3px;transition:width .5s}
+  .findings{display:grid;gap:5px}
+  .fnd{display:flex;gap:9px;font-size:13px;align-items:flex-start}
+  .fnd .ic{font-family:'IBM Plex Mono',monospace;font-weight:600;flex:0 0 auto;margin-top:1px;font-size:12px}
+  .fnd.sup .ic{color:var(--ok)}
+  .fnd.ag .ic{color:var(--crit)}
+  .fnd .tx{color:var(--ink-soft)}
+  .workup{margin-top:12px;padding-top:11px;border-top:1px dashed var(--line-soft);font-size:12.5px;color:var(--ink-soft)}
+  .workup b{color:var(--teal-deep);font-weight:600}
+
+  .flagbox{border-radius:10px;padding:14px 18px;margin-bottom:18px;font-size:13.5px;display:flex;gap:12px;align-items:flex-start}
+  .flagbox.crit{background:var(--crit-soft);border:1px solid #d9b3aa;color:#76241a}
+  .flagbox .fi{font-size:18px;flex:0 0 auto}
+  .flagbox b{font-weight:600}
+
+  footer{margin-top:54px;padding-top:22px;border-top:1px solid var(--line);
+    font-size:12px;color:var(--muted);text-align:center;line-height:1.7}
+  footer b{color:var(--ink-soft)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="kicker">Hepatic Panel · 鑑別支援ツール</div>
+    <h1>肝機能障害 鑑別支援</h1>
+    <p class="sub">血液検査値を入力すると、障害パターン（肝細胞障害型／胆汁うっ滞型／混合型）を分類し、典型的な鑑別疾患を所見の根拠とともに提示します。</p>
+    <div class="disclaimer">
+      <span>⚠</span>
+      <div><b>本ツールは医学教育・思考整理を目的とした補助ツールです。</b>診断・治療の判断は必ず病歴・身体所見・画像・経時変化を含めて医師が総合的に行ってください。提示内容は確定診断ではありません。</div>
+    </div>
+  </header>
+
+  <div class="grid">
+    <!-- INPUT -->
+    <div class="panel" id="inputPanel">
+      <div class="panel-title"><span><span class="num">01</span> 検査所見入力</span>
+        <span class="seg" id="sexSeg">
+          <button data-sex="M" class="on">男性</button>
+          <button data-sex="F">女性</button>
+        </span>
+      </div>
+
+      <div class="grp-label">トランスアミナーゼ</div>
+      <div id="grp1"></div>
+      <div class="grp-label">胆道系酵素</div>
+      <div id="grp2"></div>
+      <div class="grp-label">ビリルビン</div>
+      <div id="grp3"></div>
+      <div class="grp-label">合成能・その他</div>
+      <div id="grp4"></div>
+
+      <div class="btn-row">
+        <button class="btn btn-main" id="runBtn">鑑別する</button>
+        <button class="btn btn-ghost" id="clearBtn">クリア</button>
+      </div>
+
+      <div class="presets">
+        <div class="pl">▸ 入力例（クリックで読込）</div>
+        <div class="chips" id="presetChips"></div>
+      </div>
+    </div>
+
+    <!-- RESULTS -->
+    <div class="results" id="results">
+      <div class="empty">
+        <svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3">
+          <path d="M9 3h6l1 4-2 2v5l3 6H7l3-6V9L8 7z"/></svg>
+        <div>検査値を入力して<br><b style="color:var(--ink-soft)">「鑑別する」</b>を押してください</div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <b>パターン分類</b>は R比 =（ALT/基準上限）÷（ALP/基準上限）に基づきます ── R≧5：肝細胞障害型、R≦2：胆汁うっ滞型、2&lt;R&lt;5：混合型。<br>
+    De Ritis比 = AST/ALT。基準値は施設や測定法で異なります（ALPはIFCC法を既定）。各値は施設基準に合わせてご確認ください。
+  </footer>
+</div>
+
+<script>
+// ===== 検査項目定義（基準上限/下限は施設・測定法で変動。既定値は一般的目安）=====
+const SEX = {cur:'M'};
+const ITEMS = [
+  {grp:1, key:'ast',  nm:'AST (GOT)', unit:'U/L', uln:30,  ph:'例 35'},
+  {grp:1, key:'alt',  nm:'ALT (GPT)', unit:'U/L', uln:{M:42,F:27}, ph:'例 40'},
+  {grp:2, key:'alp',  nm:'ALP', unit:'U/L', uln:113, hint:'IFCC法', ph:'例 100'},
+  {grp:2, key:'ggt',  nm:'γ-GTP', unit:'U/L', uln:{M:73,F:38}, ph:'例 60'},
+  {grp:3, key:'tbil', nm:'総ビリルビン', unit:'mg/dL', uln:1.2, ph:'例 0.8'},
+  {grp:3, key:'dbil', nm:'直接ビリルビン', unit:'mg/dL', uln:0.4, ph:'例 0.3'},
+  {grp:4, key:'alb',  nm:'アルブミン', unit:'g/dL', lln:3.9, ph:'例 4.2'},
+  {grp:4, key:'ptinr',nm:'PT-INR', unit:'', uln:1.15, ph:'例 1.0'},
+  {grp:4, key:'plt',  nm:'血小板', unit:'×10⁴/μL', lln:15, ph:'例 22'},
+];
+function uln(it){ return typeof it.uln==='object' ? it.uln[SEX.cur] : it.uln; }
+function refText(it){
+  if(it.uln!==undefined){ return (it.hint?it.hint+' ':'')+'≦'+uln(it)+' '+it.unit; }
+  if(it.lln!==undefined){ return '≧'+it.lln+' '+it.unit; }
+  return it.unit;
+}
+
+// ===== 入力UI構築 =====
+function buildInputs(){
+  [1,2,3,4].forEach(g=>{
+    const c=document.getElementById('grp'+g); c.innerHTML='';
+    ITEMS.filter(i=>i.grp===g).forEach(it=>{
+      const f=document.createElement('div'); f.className='field';
+      f.innerHTML=`<div class="lab"><span class="nm">${it.nm}</span><span class="rg" data-rg="${it.key}">${refText(it)}</span></div>
+        <input type="number" step="any" inputmode="decimal" id="in_${it.key}" placeholder="${it.ph}">`;
+      c.appendChild(f);
+      f.querySelector('input').addEventListener('input',e=>flagField(it,e.target));
+    });
+  });
+}
+function flagField(it,el){
+  el.classList.remove('flag-hi','flag-lo');
+  const v=parseFloat(el.value); if(isNaN(v))return;
+  if(it.uln!==undefined && v>uln(it)) el.classList.add('flag-hi');
+  if(it.lln!==undefined && v<it.lln) el.classList.add('flag-lo');
+}
+function refreshRefs(){
+  ITEMS.forEach(it=>{
+    const r=document.querySelector(`[data-rg="${it.key}"]`); if(r)r.textContent=refText(it);
+    const el=document.getElementById('in_'+it.key); if(el)flagField(it,el);
+  });
+}
+
+// ===== メトリクス計算 =====
+function readVals(){
+  const v={};
+  ITEMS.forEach(it=>{ const x=parseFloat(document.getElementById('in_'+it.key).value); v[it.key]=isNaN(x)?null:x; });
+  return v;
+}
+function metrics(v){
+  const ulnA={}; ITEMS.forEach(it=>{ if(it.uln!==undefined)ulnA[it.key]=uln(it); });
+  const m={v, uln:ulnA};
+  m.has=k=>v[k]!==null;
+  m.fold=k=> (v[k]!=null && ulnA[k]) ? v[k]/ulnA[k] : null;
+  m.hi=k=> v[k]!=null && ulnA[k] ? v[k]>ulnA[k] : false;
+  m.astF=m.fold('ast'); m.altF=m.fold('alt'); m.alpF=m.fold('alp'); m.ggtF=m.fold('ggt');
+  m.deRitis=(v.ast!=null&&v.alt!=null&&v.alt>0)? v.ast/v.alt : null;
+  m.R=(m.altF!=null&&m.alpF!=null&&m.alpF>0)? m.altF/m.alpF : null;
+  m.maxTA=Math.max(v.ast??0, v.alt??0);
+  m.maxTAfold=Math.max(m.astF??0, m.altF??0);
+  // ビリルビン分画
+  if(v.tbil!=null&&v.dbil!=null){ m.indirect=Math.max(0,v.tbil-v.dbil); m.dirFrac=v.tbil>0?v.dbil/v.tbil:0; }
+  m.tbilHi=v.tbil!=null && v.tbil>1.2;
+  m.lowAlb=v.alb!=null && v.alb<3.9;
+  m.highINR=v.ptinr!=null && v.ptinr>=1.5;
+  m.lowPlt=v.plt!=null && v.plt<15;
+  // パターン
+  if(m.R!=null && (m.hi('alt')||m.hi('alp'))){
+    m.pattern = m.R>=5?'hep' : m.R<=2?'chol' : 'mix';
+  } else if(m.tbilHi && !m.hi('ast') && !m.hi('alt') && !m.hi('alp') && !m.hi('ggt')){
+    m.pattern='bili';
+  } else if(m.hi('ast')||m.hi('alt')){ m.pattern='hep'; }
+  else if(m.hi('alp')||m.hi('ggt')){ m.pattern='chol'; }
+  else { m.pattern = (m.tbilHi||m.lowAlb||m.highINR||m.lowPlt)?'mix':'none'; }
+  return m;
+}
+
+// ===== 鑑別疾患ルール =====
+// 各疾患: pattern(該当パターン), eval(m)→{sup:[],ag:[],score,workup}
+const DISEASES = [
+ {nm:'急性ウイルス性肝炎', cat:'肝細胞障害', pat:['hep'], eval:m=>{
+   const s=[],a=[]; let sc=0;
+   if(m.maxTAfold>=10){s.push('トランスアミナーゼ著明上昇（>10×ULN）');sc+=3;}
+   else if(m.maxTAfold>=5){s.push('トランスアミナーゼ高度上昇');sc+=1;}
+   if(m.deRitis!=null&&m.deRitis<1){s.push('AST<ALT（De Ritis<1）');sc+=2;}
+   if(m.tbilHi){s.push('ビリルビン上昇を伴う');sc+=1;}
+   if(m.deRitis!=null&&m.deRitis>2){a.push('AST/ALT>2はウイルス性肝炎に非典型');}
+   return {sup:s,ag:a,score:sc,workup:'HBs抗原・HCV抗体・IgM-HA抗体・HEV、EBV/CMV、経時的フォロー'};
+ }},
+ {nm:'慢性肝炎（B/C型・その他）', cat:'肝細胞障害', pat:['hep','mix'], eval:m=>{
+   const s=[],a=[]; let sc=0;
+   if(m.maxTAfold!=null&&m.maxTAfold>1&&m.maxTAfold<10){s.push('トランスアミナーゼ軽度〜中等度上昇');sc+=2;}
+   if(m.lowPlt){s.push('血小板低下（線維化進行の示唆）');sc+=2;}
+   if(m.deRitis!=null&&m.deRitis<1){s.push('AST≦ALT');sc+=1;}
+   return {sup:s,ag:a,score:sc,workup:'肝炎ウイルスマーカー、線維化指標（FIB-4・APRI）、腹部エコー'};
+ }},
+ {nm:'アルコール性肝障害', cat:'肝細胞障害', pat:['hep','mix'], eval:m=>{
+   const s=[],a=[]; let sc=0;
+   if(m.deRitis!=null&&m.deRitis>2){s.push('AST/ALT>2（De Ritis比上昇）');sc+=3;}
+   else if(m.deRitis!=null&&m.deRitis>1){s.push('AST>ALT');sc+=1;}
+   if(m.ggtF!=null&&m.ggtF>2){s.push('γ-GTP著明上昇');sc+=2;}
+   else if(m.hi('ggt')){s.push('γ-GTP上昇');sc+=1;}
+   if(m.v.ast!=null&&m.v.ast>500){a.push('AST>500U/Lはアルコール単独では非典型');}
+   return {sup:s,ag:a,score:sc,workup:'飲酒歴の聴取、CDT・MCV、栄養評価、腹部エコー'};
+ }},
+ {nm:'NAFLD / NASH（脂肪性肝疾患）', cat:'肝細胞障害', pat:['hep'], eval:m=>{
+   const s=[],a=[]; let sc=0;
+   if(m.deRitis!=null&&m.deRitis<1){s.push('ALT>AST（早期に多い）');sc+=2;}
+   if(m.maxTAfold!=null&&m.maxTAfold<=5&&(m.hi('alt')||m.hi('ast'))){s.push('軽度のトランスアミナーゼ上昇');sc+=2;}
+   if(m.hi('ggt')){s.push('γ-GTP軽度上昇を伴いうる');sc+=1;}
+   if(m.maxTAfold>10){a.push('著明上昇は単純脂肪肝に非典型');}
+   return {sup:s,ag:a,score:sc,workup:'代謝因子（肥満・糖尿病・脂質）、腹部エコー/CT、線維化評価'};
+ }},
+ {nm:'薬物性肝障害（DILI）', cat:'全パターン', pat:['hep','chol','mix'], eval:m=>{
+   const s=[],a=[]; let sc=1;
+   s.push('いずれのパターンでも鑑別に挙げる（薬剤・サプリ歴の確認必須）');
+   if(m.pattern==='mix'){s.push('混合型はDILIで比較的多い');sc+=1;}
+   return {sup:s,ag:a,score:sc,workup:'被疑薬の時間経過、中止後の改善（dechallenge）、DLST・好酸球'};
+ }},
+ {nm:'自己免疫性肝炎（AIH）', cat:'肝細胞障害', pat:['hep'], eval:m=>{
+   const s=[],a=[]; let sc=0;
+   if(m.maxTAfold!=null&&m.maxTAfold>=5){s.push('トランスアミナーゼ中等度〜高度上昇');sc+=2;}
+   if(m.deRitis!=null&&m.deRitis<1){s.push('肝細胞障害優位');sc+=1;}
+   return {sup:s,ag:a,score:sc,workup:'抗核抗体・抗平滑筋抗体、IgG高値、肝生検（特に中年女性で考慮）'};
+ }},
+ {nm:'虚血性肝炎（ショック肝）', cat:'肝細胞障害', pat:['hep'], eval:m=>{
+   const s=[],a=[]; let sc=0;
+   if(m.maxTA>1000){s.push('トランスアミナーゼ著明上昇（しばしば>1000U/L）');sc+=2;}
+   if(m.maxTAfold>20){s.push('極端な高値');sc+=1;}
+   return {sup:s,ag:a,score:sc,workup:'循環不全の病歴（ショック・心不全）、LDH著増、急速な上昇と下降の確認'};
+ }},
+ {nm:'急性肝不全（劇症化）', cat:'重症度フラグ', pat:['hep','mix','chol'], eval:m=>{
+   const s=[],a=[]; let sc=0;
+   if(m.highINR){s.push('PT-INR≧1.5（合成能低下）');sc+=3;}
+   if(m.tbilHi&&m.v.tbil>5){s.push('高ビリルビン血症');sc+=1;}
+   return {sup:s,ag:a,score:sc,workup:'⚠ 凝固能・意識（肝性脳症）を緊急評価、専門医へ。アンモニア・血糖'};
+ }},
+ {nm:'肝外胆道閉塞（結石・腫瘍）', cat:'胆汁うっ滞', pat:['chol','mix'], eval:m=>{
+   const s=[],a=[]; let sc=0;
+   if(m.alpF!=null&&m.alpF>1.5){s.push('ALP上昇優位');sc+=2;}
+   if(m.hi('ggt')){s.push('γ-GTP上昇（胆道系酵素上昇）');sc+=2;}
+   if(m.v.dbil!=null&&m.v.dbil>0.4&&m.dirFrac>0.4){s.push('直接ビリルビン優位の上昇');sc+=2;}
+   return {sup:s,ag:a,score:sc,workup:'腹部エコー/CT/MRCPで胆管拡張の評価、腫瘍マーカー'};
+ }},
+ {nm:'原発性胆汁性胆管炎（PBC）', cat:'胆汁うっ滞', pat:['chol'], eval:m=>{
+   const s=[],a=[]; let sc=0;
+   if(m.alpF!=null&&m.alpF>1.5){s.push('ALP持続上昇');sc+=2;}
+   if(m.hi('ggt')){s.push('γ-GTP上昇');sc+=1;}
+   if(m.v.dbil!=null&&m.dirFrac<0.3&&m.alpF>1.5){s.push('初期は黄疸を伴わないことが多い');sc+=1;}
+   return {sup:s,ag:a,score:sc,workup:'抗ミトコンドリア抗体（AMA）、IgM高値（中年女性で特に考慮）'};
+ }},
+ {nm:'原発性硬化性胆管炎（PSC）', cat:'胆汁うっ滞', pat:['chol'], eval:m=>{
+   const s=[],a=[]; let sc=0;
+   if(m.alpF!=null&&m.alpF>1.5){s.push('ALP上昇優位');sc+=2;}
+   if(m.hi('ggt')){s.push('γ-GTP上昇');sc+=1;}
+   return {sup:s,ag:a,score:sc,workup:'MRCP（胆管の数珠状狭窄）、炎症性腸疾患の合併検索'};
+ }},
+ {nm:'体質性黄疸（Gilbert症候群）', cat:'孤立性ビリルビン', pat:['bili'], eval:m=>{
+   const s=[],a=[]; let sc=0;
+   if(m.indirect!=null&&m.dirFrac<0.2&&m.tbilHi){s.push('間接（非抱合）ビリルビン優位の上昇');sc+=3;}
+   if(!m.hi('ast')&&!m.hi('alt')&&!m.hi('alp')){s.push('他の肝酵素は正常');sc+=2;}
+   return {sup:s,ag:a,score:sc,workup:'絶食・ストレスで増悪、溶血の除外（網赤血球・ハプトグロビン正常）'};
+ }},
+ {nm:'溶血性黄疸', cat:'孤立性ビリルビン', pat:['bili'], eval:m=>{
+   const s=[],a=[]; let sc=0;
+   if(m.indirect!=null&&m.dirFrac<0.2&&m.tbilHi){s.push('間接ビリルビン優位の上昇');sc+=2;}
+   if(!m.hi('alt')&&!m.hi('alp')){s.push('肝胆道系酵素は正常');sc+=1;}
+   return {sup:s,ag:a,score:sc,workup:'LDH上昇・ハプトグロビン低下・網赤血球増加・貧血・末梢血塗抹'};
+ }},
+ {nm:'肝硬変（非代償性を含む）', cat:'合成能低下', pat:['hep','mix','chol'], eval:m=>{
+   const s=[],a=[]; let sc=0;
+   if(m.lowAlb){s.push('アルブミン低下');sc+=2;}
+   if(m.highINR){s.push('PT延長（INR上昇）');sc+=2;}
+   if(m.lowPlt){s.push('血小板低下（門脈圧亢進の示唆）');sc+=2;}
+   if(m.deRitis!=null&&m.deRitis>1){s.push('AST/ALT>1');sc+=1;}
+   return {sup:s,ag:a,score:sc,workup:'腹部画像（表面凹凸・脾腫）、Child-Pugh/MELD評価、静脈瘤スクリーニング'};
+ }},
+ {nm:'孤立性γ-GTP上昇', cat:'その他', pat:['hep','chol','mix','none'], eval:m=>{
+   const s=[],a=[]; let sc=0;
+   if(m.hi('ggt')&&!m.hi('alp')&&!m.hi('ast')&&!m.hi('alt')){s.push('γ-GTP単独上昇');sc+=2;}
+   return {sup:s,ag:a,score:sc,workup:'飲酒・薬剤（酵素誘導）・脂肪肝を検討。臨床的意義は限定的なことも'};
+ }},
+];
+
+const PAT_INFO = {
+  hep:{n:'肝細胞障害型', d:'AST・ALTの上昇が優位。肝細胞そのものの障害を示唆します。'},
+  chol:{n:'胆汁うっ滞型', d:'ALP・γ-GTPの上昇が優位。胆汁の流れの障害（胆道系）を示唆します。'},
+  mix:{n:'混合型', d:'肝細胞障害と胆汁うっ滞の所見が混在しています。'},
+  bili:{n:'孤立性高ビリルビン血症', d:'肝酵素は正常で、ビリルビンのみ上昇しています。'},
+  none:{n:'明らかな異常パターンなし', d:'入力範囲では明確な障害パターンは抽出されませんでした。'},
+};
+
+// ===== 実行 =====
+function run(){
+  const v=readVals();
+  if(Object.values(v).every(x=>x===null)){ return; }
+  const m=metrics(v);
+  const matched=[];
+  DISEASES.forEach(d=>{
+    if(!d.pat.includes(m.pattern)) return;
+    const r=d.eval(m);
+    if(r.score>0) matched.push({d,r});
+  });
+  matched.sort((a,b)=>b.r.score-a.r.score);
+  render(m,matched);
+}
+
+function render(m,matched){
+  const R=document.getElementById('results');
+  const pi=PAT_INFO[m.pattern];
+  let html='';
+
+  // 重症フラグ
+  if(m.highINR || (m.tbilHi&&m.v.tbil>10)){
+    html+=`<div class="flagbox crit"><span class="fi">🚨</span><div><b>重症化のサイン:</b> ${m.highINR?'PT-INR≧1.5（合成能低下）':''}${m.highINR&&m.tbilHi&&m.v.tbil>10?'・':''}${m.tbilHi&&m.v.tbil>10?'著明な高ビリルビン血症':''} を認めます。急性肝不全の可能性を念頭に、凝固能・意識状態を緊急評価し専門医への相談を検討してください。</div></div>`;
+  }
+
+  // パターンバナー
+  const ro=[];
+  if(m.R!=null) ro.push(`<div class="ro"><div class="rl">R比 (ALT/ALP)</div><div class="rv">${m.R.toFixed(1)}</div></div>`);
+  if(m.deRitis!=null) ro.push(`<div class="ro"><div class="rl">De Ritis (AST/ALT)</div><div class="rv">${m.deRitis.toFixed(2)}</div></div>`);
+  if(m.maxTAfold>0) ro.push(`<div class="ro"><div class="rl">最大トランスアミナーゼ</div><div class="rv">${m.maxTAfold.toFixed(1)}×</div></div>`);
+  if(m.dirFrac!=null&&m.tbilHi) ro.push(`<div class="ro"><div class="rl">直接Bil分画</div><div class="rv">${Math.round(m.dirFrac*100)}%</div></div>`);
+  html+=`<div class="pattern ${m.pattern}">
+    <div class="pk">パターン分類</div>
+    <div class="pt-name">${pi.n}</div>
+    <div class="pt-desc">${pi.d}</div>
+    ${ro.length?`<div class="readouts">${ro.join('')}</div>`:''}
+  </div>`;
+
+  // 鑑別リスト
+  if(matched.length===0){
+    html+=`<div class="dx"><div class="dx-name" style="font-size:16px">該当する鑑別が抽出されませんでした</div>
+      <p style="font-size:13px;color:var(--ink-soft);margin-top:6px">入力値が基準範囲内、または情報が不足している可能性があります。複数項目の入力で精度が上がります。</p></div>`;
+  } else {
+    const maxSc=matched[0].r.score;
+    html+=`<div class="sec-h">鑑別疾患<span class="ct">${matched.length}件 / 該当度順</span></div>`;
+    matched.forEach((it,i)=>{
+      const {d,r}=it; const pct=Math.min(100,Math.round(r.score/Math.max(maxSc,1)*100));
+      const sup=r.sup.map(s=>`<div class="fnd sup"><span class="ic">✓</span><span class="tx">${s}</span></div>`).join('');
+      const ag=r.ag.map(s=>`<div class="fnd ag"><span class="ic">✕</span><span class="tx">${s}</span></div>`).join('');
+      html+=`<div class="dx ${i===0&&maxSc>=3?'top':''}">
+        <div class="dx-head"><span class="dx-rank">${String(i+1).padStart(2,'0')}</span>
+          <span class="dx-name">${d.nm}</span><span class="dx-cat">${d.cat}</span></div>
+        <div class="like"><span style="width:${pct}%"></span></div>
+        <div class="findings">${sup}${ag}</div>
+        <div class="workup"><b>確認・追加検査:</b> ${r.workup}</div>
+      </div>`;
+    });
+  }
+  R.innerHTML=html;
+}
+
+// ===== プリセット =====
+const PRESETS={
+  '急性ウイルス性肝炎':{ast:1200,alt:1800,alp:140,ggt:90,tbil:4.5,dbil:3.2,alb:4.0,ptinr:1.1,plt:20},
+  'アルコール性':{ast:240,alt:90,alp:160,ggt:480,tbil:2.1,dbil:1.4,alb:3.4,ptinr:1.2,plt:13},
+  'NASH/脂肪肝':{ast:48,alt:85,alp:95,ggt:80,tbil:0.7,dbil:0.2,alb:4.3,ptinr:1.0,plt:24},
+  '閉塞性黄疸':{ast:90,alt:110,alp:520,ggt:610,tbil:8.5,dbil:6.8,alb:3.8,ptinr:1.1,plt:28},
+  'PBC':{ast:55,alt:48,alp:380,ggt:340,tbil:1.0,dbil:0.3,alb:4.1,ptinr:1.0,plt:22},
+  'Gilbert症候群':{ast:22,alt:20,alp:80,ggt:25,tbil:2.4,dbil:0.3,alb:4.4,ptinr:1.0,plt:25},
+  '肝硬変(非代償)':{ast:75,alt:55,alp:150,ggt:90,tbil:3.5,dbil:2.0,alb:2.8,ptinr:1.6,plt:8},
+};
+function buildPresets(){
+  const c=document.getElementById('presetChips');
+  Object.keys(PRESETS).forEach(k=>{
+    const b=document.createElement('button'); b.className='chip'; b.textContent=k;
+    b.onclick=()=>{ loadPreset(PRESETS[k]); run(); };
+    c.appendChild(b);
+  });
+}
+function loadPreset(p){
+  ITEMS.forEach(it=>{ const el=document.getElementById('in_'+it.key);
+    el.value=p[it.key]??''; flagField(it,el); });
+}
+function clearAll(){
+  ITEMS.forEach(it=>{ const el=document.getElementById('in_'+it.key); el.value=''; el.classList.remove('flag-hi','flag-lo'); });
+  document.getElementById('results').innerHTML=`<div class="empty">
+    <svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M9 3h6l1 4-2 2v5l3 6H7l3-6V9L8 7z"/></svg>
+    <div>検査値を入力して<br><b style="color:var(--ink-soft)">「鑑別する」</b>を押してください</div></div>`;
+}
+
+// ===== 初期化 =====
+buildInputs(); buildPresets();
+document.getElementById('runBtn').onclick=run;
+document.getElementById('clearBtn').onclick=clearAll;
+document.querySelectorAll('#sexSeg button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('#sexSeg button').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on'); SEX.cur=b.dataset.sex; refreshRefs();
+});
+document.addEventListener('keydown',e=>{ if(e.key==='Enter')run(); });
+</script>
+</body>
+</html>
