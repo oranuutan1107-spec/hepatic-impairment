@@ -153,6 +153,37 @@
   footer{margin-top:54px;padding-top:22px;border-top:1px solid var(--line);
     font-size:12px;color:var(--muted);text-align:center;line-height:1.7}
   footer b{color:var(--ink-soft)}
+
+  /* 薬剤入力 */
+  .med-input{display:flex;gap:8px;margin-top:6px}
+  .med-input input{flex:1;font-family:inherit;font-size:13.5px;padding:9px 11px;border:1px solid var(--line);border-radius:7px;background:#fff;color:var(--ink)}
+  .med-input input:focus{outline:none;border-color:var(--teal);box-shadow:0 0 0 3px var(--teal-soft)}
+  .med-add{font-family:inherit;font-weight:600;font-size:13px;padding:0 16px;border:1px solid var(--ink);background:var(--ink);color:var(--paper);border-radius:7px;cursor:pointer;transition:.15s}
+  .med-add:hover{background:var(--teal-deep);border-color:var(--teal-deep)}
+  .med-chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:11px}
+  .med-chip{display:flex;align-items:center;gap:8px;font-size:12.5px;padding:5px 8px 5px 12px;border-radius:20px;background:var(--paper-2);border:1px solid var(--line);color:var(--ink-soft)}
+  .med-chip.known{border-color:var(--amber);background:var(--amber-soft);color:#6e4a0f;font-weight:500}
+  .med-chip .rm{cursor:pointer;width:17px;height:17px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.1);font-size:11px;line-height:1}
+  .med-chip .rm:hover{background:rgba(0,0,0,.25)}
+
+  /* DILIセクション */
+  .dili{background:linear-gradient(140deg,#fbf3e3,#f5e8cf);border:1px solid #e3cfa3;border-radius:12px;padding:21px 23px;margin:22px 0}
+  .dili-h{font-family:'IBM Plex Serif',serif;font-size:20px;font-weight:600;color:#6e4a0f;display:flex;align-items:center;gap:10px;margin-bottom:5px}
+  .dili-sub{font-size:12.5px;color:#7a5a24;margin-bottom:6px;line-height:1.55}
+  .dili-sh{font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:#8a6a2a;font-weight:600;margin:18px 0 10px;display:flex;align-items:center;gap:9px}
+  .dili-sh::after{content:"";flex:1;height:1px;background:#e3cfa3}
+  .drug{background:rgba(255,255,255,.55);border:1px solid #e6d6b3;border-radius:9px;padding:11px 14px;margin-bottom:8px}
+  .drug.match{border-color:var(--amber);background:#fff;box-shadow:0 7px 20px -14px rgba(169,106,18,.65)}
+  .drug-top{display:flex;align-items:baseline;gap:9px;flex-wrap:wrap}
+  .drug-nm{font-weight:600;font-size:14.5px;color:#5a3c0b}
+  .drug-use{font-size:11px;color:#a07f3e;font-family:'IBM Plex Mono',monospace;margin-left:auto}
+  .drug-pat{font-size:10px;font-family:'IBM Plex Mono',monospace;padding:2px 7px;border-radius:4px;border:1px solid #d8b97a;color:#7a5a24}
+  .drug-note{font-size:12px;color:#6e5526;margin-top:6px;line-height:1.5}
+  .drug-conc{font-size:11.5px;font-weight:600;margin-top:7px}
+  .drug-conc.yes{color:var(--amber)}
+  .drug-conc.no{color:#a07f3e;font-weight:400}
+  .ref-drugs{display:flex;flex-wrap:wrap;gap:7px}
+  .ref-drug{font-size:12px;padding:5px 11px;border-radius:7px;background:rgba(255,255,255,.5);border:1px solid #e6d6b3;color:#6e5526}
 </style>
 </head>
 <body>
@@ -185,6 +216,14 @@
       <div id="grp3"></div>
       <div class="grp-label">合成能・その他</div>
       <div id="grp4"></div>
+
+      <div class="grp-label">使用中の薬剤（任意）</div>
+      <div class="med-input">
+        <input type="text" id="medInput" list="drugList" placeholder="薬剤名を入力（例: アモキシシリン）" autocomplete="off">
+        <button class="med-add" id="addMed">追加</button>
+      </div>
+      <datalist id="drugList"></datalist>
+      <div class="med-chips" id="medChips"></div>
 
       <div class="btn-row">
         <button class="btn btn-main" id="runBtn">鑑別する</button>
@@ -409,6 +448,105 @@ const PAT_INFO = {
   none:{n:'明らかな異常パターンなし', d:'入力範囲では明確な障害パターンは抽出されませんでした。'},
 };
 
+// ===== 薬剤性肝障害：代表的な肝障害関連薬DB（網羅的ではありません）=====
+// pat: 典型的な障害パターン hep=肝細胞障害型 / chol=胆汁うっ滞型 / mix=混合型
+const DRUGS = [
+ {nm:'アセトアミノフェン', en:'acetaminophen', alias:['カロナール','アセリオ','APAP','paracetamol'], use:'解熱鎮痛', pat:['hep'], note:'用量依存性。過量で重篤な肝細胞壊死を起こし、トランスアミナーゼが著明上昇する'},
+ {nm:'イソニアジド(INH)', en:'isoniazid', alias:['INH','イスコチン'], use:'抗結核', pat:['hep'], note:'潜時は数週〜数ヶ月。年齢とともにリスク上昇'},
+ {nm:'リファンピシン', en:'rifampicin', alias:['リファジン','RFP'], use:'抗結核', pat:['mix','chol'], note:'抱合阻害で間接ビリルビンも上昇しうる'},
+ {nm:'ピラジナミド', en:'pyrazinamide', alias:['PZA'], use:'抗結核', pat:['hep'], note:'用量依存性の肝毒性'},
+ {nm:'アモキシシリン・クラブラン酸', en:'amoxicillin-clavulanate', alias:['オーグメンチン','クラバモックス','co-amoxiclav','augmentin'], use:'抗菌薬', pat:['chol','mix'], note:'DILIの最頻原因の一つ。潜時が長く中止後に発症することもある。胆汁うっ滞型が典型'},
+ {nm:'マクロライド系', en:'macrolide', alias:['エリスロマイシン','クラリスロマイシン','クラリス','アジスロマイシン','ジスロマック','erythromycin','clarithromycin'], use:'抗菌薬', pat:['chol','hep'], note:'胆汁うっ滞型が多い'},
+ {nm:'ST合剤', en:'trimethoprim-sulfamethoxazole', alias:['バクタ','TMP-SMX','sulfamethoxazole','スルファメトキサゾール','co-trimoxazole'], use:'抗菌薬', pat:['mix','chol'], note:'過敏機序。発疹・好酸球増多を伴うことがある'},
+ {nm:'ニトロフラントイン', en:'nitrofurantoin', alias:[], use:'抗菌薬(尿路)', pat:['hep','mix'], note:'急性肝細胞型から慢性の自己免疫様肝炎まで'},
+ {nm:'テルビナフィン', en:'terbinafine', alias:['ラミシール'], use:'抗真菌', pat:['chol','mix'], note:'遷延性の胆汁うっ滞を起こしうる'},
+ {nm:'アゾール系抗真菌薬', en:'azole antifungal', alias:['ケトコナゾール','イトラコナゾール','フルコナゾール','ボリコナゾール','ketoconazole','itraconazole'], use:'抗真菌', pat:['hep','mix'], note:'ケトコナゾールは肝毒性が比較的強い'},
+ {nm:'NSAIDs', en:'NSAID', alias:['ジクロフェナク','ボルタレン','イブプロフェン','ロキソプロフェン','ロキソニン','ナプロキセン','diclofenac','ibuprofen'], use:'解熱鎮痛・抗炎症', pat:['hep','mix'], note:'ジクロフェナクは肝細胞型DILIの報告が比較的多い'},
+ {nm:'スタチン系', en:'statin', alias:['アトルバスタチン','リピトール','ロスバスタチン','クレストール','シンバスタチン','プラバスタチン','atorvastatin','rosuvastatin'], use:'脂質異常症', pat:['hep'], note:'軽度のトランスアミナーゼ上昇が多く、重症DILIは稀'},
+ {nm:'メトトレキサート(MTX)', en:'methotrexate', alias:['MTX','リウマトレックス','メトトレキセート'], use:'抗リウマチ・抗腫瘍', pat:['hep'], note:'長期使用で脂肪肝・線維化。累積投与量に注意'},
+ {nm:'アミオダロン', en:'amiodarone', alias:['アンカロン'], use:'抗不整脈', pat:['hep','mix'], note:'脂肪性肝炎様(リン脂質蓄積)。慢性経過'},
+ {nm:'バルプロ酸', en:'valproate', alias:['デパケン','バレリン','VPA','valproic'], use:'抗てんかん・気分安定', pat:['hep'], note:'小児・ミトコンドリア病でリスク。高アンモニア血症を伴うことも'},
+ {nm:'フェニトイン', en:'phenytoin', alias:['アレビアチン','ヒダントール'], use:'抗てんかん', pat:['mix','hep'], note:'過敏症候群(DRESS)の一部として。発熱・発疹・好酸球増多'},
+ {nm:'カルバマゼピン', en:'carbamazepine', alias:['テグレトール'], use:'抗てんかん', pat:['mix','chol'], note:'過敏機序。DRESSの一部となりうる'},
+ {nm:'クロルプロマジン', en:'chlorpromazine', alias:['コントミン','ウインタミン'], use:'抗精神病', pat:['chol'], note:'古典的な胆汁うっ滞型DILI'},
+ {nm:'蛋白同化ステロイド/アンドロゲン', en:'anabolic steroid', alias:['メチルテストステロン','ダナゾール','oxymetholone','androgen'], use:'ホルモン・筋増強', pat:['chol'], note:'炎症の乏しい胆汁うっ滞(bland cholestasis)'},
+ {nm:'経口避妊薬/エストロゲン', en:'estrogen', alias:['経口避妊薬','OC','ピル','エチニルエストラジオール','oral contraceptive'], use:'ホルモン', pat:['chol'], note:'胆汁うっ滞。胆石・肝腺腫のリスクも'},
+ {nm:'アロプリノール', en:'allopurinol', alias:['ザイロリック'], use:'高尿酸血症', pat:['hep','mix'], note:'過敏症候群を伴いうる'},
+ {nm:'免疫チェックポイント阻害薬', en:'immune checkpoint inhibitor', alias:['ニボルマブ','オプジーボ','ペムブロリズマブ','キイトルーダ','イピリムマブ','ICI','nivolumab','pembrolizumab'], use:'抗腫瘍(免疫)', pat:['hep','mix'], note:'免疫関連肝障害(irAE)。ステロイド治療を要することがある'},
+ {nm:'抗甲状腺薬', en:'antithyroid', alias:['プロピルチオウラシル','PTU','チアマゾール','メルカゾール','propylthiouracil','thiamazole'], use:'甲状腺', pat:['hep','chol'], note:'PTUは肝細胞型、チアマゾールは胆汁うっ滞型が多い'},
+ {nm:'アザチオプリン', en:'azathioprine', alias:['イムラン','アザニン'], use:'免疫抑制', pat:['chol','mix'], note:'胆汁うっ滞・類洞閉塞症候群'},
+ {nm:'チクロピジン', en:'ticlopidine', alias:['パナルジン'], use:'抗血小板', pat:['chol','mix'], note:'胆汁うっ滞型'},
+ {nm:'漢方・健康食品・サプリメント', en:'herbal supplement', alias:['漢方','サプリ','サプリメント','健康食品','プロテイン','緑茶抽出物','ウコン','turmeric','kava','supplement','herbal'], use:'健康食品等', pat:['hep','mix','chol'], note:'見落とされやすい重要な原因。ウコン等でも報告あり。必ず聴取する'},
+];
+const PAT_LABEL={hep:'肝細胞障害型', chol:'胆汁うっ滞型', mix:'混合型'};
+let meds=[];
+
+function buildDrugList(){
+  const dl=document.getElementById('drugList'); const set=new Set();
+  DRUGS.forEach(d=>{ set.add(d.nm); (d.alias||[]).forEach(a=>set.add(a)); });
+  dl.innerHTML=[...set].map(x=>`<option value="${x}">`).join('');
+}
+function findDrug(q){
+  const s=q.trim().toLowerCase(); if(s.length<2)return null;
+  for(const d of DRUGS){
+    const pool=[d.nm,d.en,...(d.alias||[])].map(x=>String(x).toLowerCase());
+    if(pool.some(p=> p && (p.includes(s) || (s.length>=4 && p.length>=4 && s.includes(p))))) return d;
+  }
+  return null;
+}
+function addMedFromInput(){
+  const el=document.getElementById('medInput'); const raw=el.value.trim(); if(!raw)return;
+  meds.push({label:raw, drug:findDrug(raw)});
+  el.value=''; renderMeds();
+}
+function renderMeds(){
+  const c=document.getElementById('medChips'); c.innerHTML='';
+  meds.forEach((m,i)=>{
+    const chip=document.createElement('span');
+    chip.className='med-chip'+(m.drug?' known':'');
+    chip.innerHTML=`${m.drug?'⚠ ':''}${m.label}<span class="rm" data-i="${i}">×</span>`;
+    chip.querySelector('.rm').onclick=()=>{ meds.splice(i,1); renderMeds(); };
+    c.appendChild(chip);
+  });
+}
+function renderDILI(m){
+  const cur=m.pattern; const patternKnown=['hep','chol','mix'].includes(cur);
+  let h=`<div class="dili"><div class="dili-h">💊 薬剤性肝障害（DILI）の検討</div>
+    <div class="dili-sub">ほぼ全ての薬剤・サプリメントが肝障害を起こし得ます。以下は代表例であり、リストにない薬剤でも否定はできません。被疑薬中止後の改善（dechallenge）と時間経過の評価が重要です。</div>`;
+
+  if(meds.length){
+    h+=`<div class="dili-sh">入力薬剤の評価 — ${meds.length}件</div>`;
+    const evald = meds.map(mm=>{
+      const d=mm.drug;
+      const conc = d && patternKnown ? d.pat.includes(cur) : false;
+      return {mm,d,conc};
+    }).sort((a,b)=> (b.conc-a.conc) || ((b.d?1:0)-(a.d?1:0)));
+    evald.forEach(({mm,d,conc})=>{
+      if(d){
+        h+=`<div class="drug ${conc?'match':''}">
+          <div class="drug-top"><span class="drug-nm">${conc?'⚠ ':''}${mm.label}</span>
+            <span class="drug-pat">${d.pat.map(p=>PAT_LABEL[p]).join(' / ')}</span>
+            <span class="drug-use">${d.use}</span></div>
+          <div class="drug-note">${d.note}</div>
+          ${patternKnown?`<div class="drug-conc ${conc?'yes':'no'}">${conc?'▶ 本症例のパターン（'+PAT_LABEL[cur]+'）と一致 — 被疑薬として要検討':'・本症例のパターンとは典型的に異なる（ただし否定はできない）'}</div>`:''}
+        </div>`;
+      } else {
+        h+=`<div class="drug"><div class="drug-top"><span class="drug-nm">${mm.label}</span>
+          <span class="drug-use">DB未収載</span></div>
+          <div class="drug-note">代表的肝障害薬リストには該当なし。ただし肝障害の報告がないとは限らないため、時間経過や他原因と併せて判断してください。</div></div>`;
+      }
+    });
+  }
+
+  if(patternKnown){
+    const ref=DRUGS.filter(d=>d.pat.includes(cur));
+    h+=`<div class="dili-sh">「${PAT_LABEL[cur]}」で代表的な被疑薬</div>
+      <div class="ref-drugs">${ref.map(d=>`<span class="ref-drug">${d.nm}</span>`).join('')}</div>`;
+  }
+  h+=`</div>`;
+  return h;
+}
+
 // ===== 実行 =====
 function run(){
   const v=readVals();
@@ -467,6 +605,7 @@ function render(m,matched){
       </div>`;
     });
   }
+  if(['hep','chol','mix'].includes(m.pattern) || meds.length){ html+=renderDILI(m); }
   R.innerHTML=html;
 }
 
@@ -494,14 +633,17 @@ function loadPreset(p){
 }
 function clearAll(){
   ITEMS.forEach(it=>{ const el=document.getElementById('in_'+it.key); el.value=''; el.classList.remove('flag-hi','flag-lo'); });
+  meds=[]; renderMeds();
   document.getElementById('results').innerHTML=`<div class="empty">
     <svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M9 3h6l1 4-2 2v5l3 6H7l3-6V9L8 7z"/></svg>
     <div>検査値を入力して<br><b style="color:var(--ink-soft)">「鑑別する」</b>を押してください</div></div>`;
 }
 
 // ===== 初期化 =====
-buildInputs(); buildPresets();
+buildInputs(); buildPresets(); buildDrugList();
 document.getElementById('runBtn').onclick=run;
+document.getElementById('addMed').onclick=addMedFromInput;
+document.getElementById('medInput').addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.stopPropagation(); addMedFromInput(); } });
 document.getElementById('clearBtn').onclick=clearAll;
 document.querySelectorAll('#sexSeg button').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('#sexSeg button').forEach(x=>x.classList.remove('on'));
