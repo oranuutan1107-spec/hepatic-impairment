@@ -184,6 +184,28 @@
   .drug-conc.no{color:#a07f3e;font-weight:400}
   .ref-drugs{display:flex;flex-wrap:wrap;gap:7px}
   .ref-drug{font-size:12px;padding:5px 11px;border-radius:7px;background:rgba(255,255,255,.5);border:1px solid #e6d6b3;color:#6e5526}
+
+  /* ICUモード */
+  .icu-toggle{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:13px 15px;margin-bottom:14px;border:1px solid var(--line);border-radius:9px;background:var(--paper-2);transition:.2s}
+  #inputPanel.icu-on .icu-toggle{border-color:var(--teal);background:var(--teal-soft)}
+  .icu-toggle .it-t{font-weight:600;font-size:14px}
+  .icu-toggle .it-d{font-size:11px;color:var(--muted);margin-top:1px;max-width:230px}
+  .sw{position:relative;display:inline-block;width:46px;height:26px;flex:0 0 auto;cursor:pointer}
+  .sw input{opacity:0;width:0;height:0}
+  .sw span{position:absolute;inset:0;background:#cfc9ba;border-radius:26px;transition:.2s}
+  .sw span::before{content:"";position:absolute;height:20px;width:20px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.25)}
+  .sw input:checked + span{background:var(--teal)}
+  .sw input:checked + span::before{transform:translateX(20px)}
+  .flagbox.info{background:var(--teal-soft);border:1px solid #a8d0c6;color:#0a4a40;border-left:4px solid var(--teal)}
+  .flagbox.info ul{margin:7px 0 0;padding-left:18px}
+  .flagbox.info li{margin:3px 0;font-size:12.5px;line-height:1.5}
+
+  /* 臨床所見 */
+  .fg-label{font-size:11px;color:var(--muted);font-family:'IBM Plex Mono',monospace;letter-spacing:.08em;margin:12px 0 7px}
+  .find-chips{display:flex;flex-wrap:wrap;gap:7px}
+  .find-chip{font-size:12px;padding:6px 11px;border:1px solid var(--line);border-radius:18px;background:#fff;cursor:pointer;color:var(--ink-soft);transition:.15s;user-select:none}
+  .find-chip:hover{border-color:var(--teal)}
+  .find-chip.on{background:var(--teal);border-color:var(--teal);color:#fff;font-weight:500}
 </style>
 </head>
 <body>
@@ -208,6 +230,11 @@
         </span>
       </div>
 
+      <div class="icu-toggle">
+        <div><div class="it-t">ICUモード</div><div class="it-d">重症患者向けの項目（LDH・CK）・鑑別・解釈上の注意を追加</div></div>
+        <label class="sw"><input type="checkbox" id="icuChk"><span></span></label>
+      </div>
+
       <div class="grp-label">トランスアミナーゼ</div>
       <div id="grp1"></div>
       <div class="grp-label">胆道系酵素</div>
@@ -217,6 +244,11 @@
       <div class="grp-label">合成能・その他</div>
       <div id="grp4"></div>
 
+      <div id="grpIcuWrap" style="display:none">
+        <div class="grp-label">重症患者関連（ICU）</div>
+        <div id="grpICU"></div>
+      </div>
+
       <div class="grp-label">使用中の薬剤（任意）</div>
       <div class="med-input">
         <input type="text" id="medInput" list="drugList" placeholder="薬剤名を入力（例: アモキシシリン）" autocomplete="off">
@@ -224,6 +256,12 @@
       </div>
       <datalist id="drugList"></datalist>
       <div class="med-chips" id="medChips"></div>
+
+      <div class="grp-label">臨床所見（該当をタップ）</div>
+      <div class="fg-label">▸ 病歴・背景</div>
+      <div class="find-chips" id="findHx"></div>
+      <div class="fg-label">▸ 症状・身体所見</div>
+      <div class="find-chips" id="findSx"></div>
 
       <div class="btn-row">
         <button class="btn btn-main" id="runBtn">鑑別する</button>
@@ -255,6 +293,8 @@
 <script>
 // ===== 検査項目定義（基準上限/下限は施設・測定法で変動。既定値は一般的目安）=====
 const SEX = {cur:'M'};
+const ICU = {on:false};
+const FIND = new Set();
 const ITEMS = [
   {grp:1, key:'ast',  nm:'AST (GOT)', unit:'U/L', uln:30,  ph:'例 35'},
   {grp:1, key:'alt',  nm:'ALT (GPT)', unit:'U/L', uln:{M:42,F:27}, ph:'例 40'},
@@ -265,6 +305,8 @@ const ITEMS = [
   {grp:4, key:'alb',  nm:'アルブミン', unit:'g/dL', lln:3.9, ph:'例 4.2'},
   {grp:4, key:'ptinr',nm:'PT-INR', unit:'', uln:1.15, ph:'例 1.0'},
   {grp:4, key:'plt',  nm:'血小板', unit:'×10⁴/μL', lln:15, ph:'例 22'},
+  {grp:5, key:'ldh',  nm:'LDH', unit:'U/L', uln:245, ph:'例 220'},
+  {grp:5, key:'ck',   nm:'CK (CPK)', unit:'U/L', uln:{M:200,F:150}, ph:'例 150'},
 ];
 function uln(it){ return typeof it.uln==='object' ? it.uln[SEX.cur] : it.uln; }
 function refText(it){
@@ -275,9 +317,10 @@ function refText(it){
 
 // ===== 入力UI構築 =====
 function buildInputs(){
-  [1,2,3,4].forEach(g=>{
-    const c=document.getElementById('grp'+g); c.innerHTML='';
-    ITEMS.filter(i=>i.grp===g).forEach(it=>{
+  const cmap={1:'grp1',2:'grp2',3:'grp3',4:'grp4',5:'grpICU'};
+  Object.entries(cmap).forEach(([g,id])=>{
+    const c=document.getElementById(id); if(!c)return; c.innerHTML='';
+    ITEMS.filter(i=>i.grp==g).forEach(it=>{
       const f=document.createElement('div'); f.className='field';
       f.innerHTML=`<div class="lab"><span class="nm">${it.nm}</span><span class="rg" data-rg="${it.key}">${refText(it)}</span></div>
         <input type="number" step="any" inputmode="decimal" id="in_${it.key}" placeholder="${it.ph}">`;
@@ -312,6 +355,8 @@ function metrics(v){
   m.fold=k=> (v[k]!=null && ulnA[k]) ? v[k]/ulnA[k] : null;
   m.hi=k=> v[k]!=null && ulnA[k] ? v[k]>ulnA[k] : false;
   m.astF=m.fold('ast'); m.altF=m.fold('alt'); m.alpF=m.fold('alp'); m.ggtF=m.fold('ggt');
+  m.ldhF=m.fold('ldh'); m.ckF=m.fold('ck'); m.ckHi=m.hi('ck');
+  m.altLdh=(v.alt!=null&&v.ldh!=null&&v.ldh>0)? v.alt/v.ldh : null;
   m.deRitis=(v.ast!=null&&v.alt!=null&&v.alt>0)? v.ast/v.alt : null;
   m.R=(m.altF!=null&&m.alpF!=null&&m.alpF>0)? m.altF/m.alpF : null;
   m.maxTA=Math.max(v.ast??0, v.alt??0);
@@ -381,11 +426,13 @@ const DISEASES = [
    if(m.deRitis!=null&&m.deRitis<1){s.push('肝細胞障害優位');sc+=1;}
    return {sup:s,ag:a,score:sc,workup:'抗核抗体・抗平滑筋抗体、IgG高値、肝生検（特に中年女性で考慮）'};
  }},
- {nm:'虚血性肝炎（ショック肝）', cat:'肝細胞障害', pat:['hep'], eval:m=>{
+ {nm:'虚血性肝炎（低酸素性肝炎・ショック肝）', cat:'肝細胞障害', pat:['hep'], eval:m=>{
    const s=[],a=[]; let sc=0;
    if(m.maxTA>1000){s.push('トランスアミナーゼ著明上昇（しばしば>1000U/L）');sc+=2;}
    if(m.maxTAfold>20){s.push('極端な高値');sc+=1;}
-   return {sup:s,ag:a,score:sc,workup:'循環不全の病歴（ショック・心不全）、LDH著増、急速な上昇と下降の確認'};
+   if(m.ldhF!=null&&m.ldhF>2){s.push('LDH著明上昇');sc+=2;}
+   if(m.altLdh!=null&&m.altLdh<1.5){s.push('ALT/LDH比<1.5（虚血を示唆、ウイルス性との鑑別に有用）');sc+=2;}
+   return {sup:s,ag:a,score:sc,workup:'循環不全の病歴（ショック・心停止・低酸素・心不全）、急峻な上昇と速やかな下降の確認、乳酸値'};
  }},
  {nm:'急性肝不全（劇症化）', cat:'重症度フラグ', pat:['hep','mix','chol'], eval:m=>{
    const s=[],a=[]; let sc=0;
@@ -399,6 +446,12 @@ const DISEASES = [
    if(m.hi('ggt')){s.push('γ-GTP上昇（胆道系酵素上昇）');sc+=2;}
    if(m.v.dbil!=null&&m.v.dbil>0.4&&m.dirFrac>0.4){s.push('直接ビリルビン優位の上昇');sc+=2;}
    return {sup:s,ag:a,score:sc,workup:'腹部エコー/CT/MRCPで胆管拡張の評価、腫瘍マーカー'};
+ }},
+ {nm:'急性胆管炎', cat:'胆汁うっ滞/緊急', pat:['chol','mix'], eval:m=>{
+   const s=[],a=[]; let sc=0;
+   if(m.alpF!=null&&m.alpF>1.5){s.push('胆道系酵素上昇（胆汁うっ滞型）');sc+=1;}
+   if(m.v.dbil!=null&&m.dirFrac>0.4&&m.tbilHi){s.push('直接ビリルビン優位の黄疸');sc+=1;}
+   return {sup:s,ag:a,score:sc,workup:'⚠ 発熱+黄疸+腹痛（Charcot三徴）では緊急。血液培養・腹部画像、胆道ドレナージ（ERCP/PTCD）を考慮'};
  }},
  {nm:'原発性胆汁性胆管炎（PBC）', cat:'胆汁うっ滞', pat:['chol'], eval:m=>{
    const s=[],a=[]; let sc=0;
@@ -438,6 +491,42 @@ const DISEASES = [
    if(m.hi('ggt')&&!m.hi('alp')&&!m.hi('ast')&&!m.hi('alt')){s.push('γ-GTP単独上昇');sc+=2;}
    return {sup:s,ag:a,score:sc,workup:'飲酒・薬剤（酵素誘導）・脂肪肝を検討。臨床的意義は限定的なことも'};
  }},
+ // ───── ICUモード専用 ─────
+ {nm:'敗血症関連胆汁うっ滞', cat:'胆汁うっ滞', pat:['chol','mix'], icu:true, eval:m=>{
+   const s=[],a=[]; let sc=0;
+   if(m.tbilHi&&m.dirFrac!=null&&m.dirFrac>0.5){s.push('直接（抱合）ビリルビン優位の上昇');sc+=2;}
+   if(m.alpF!=null&&m.alpF<3&&m.tbilHi){s.push('ALP上昇は軽度〜中等度にとどまることが多い');sc+=1;}
+   if(m.maxTAfold!=null&&m.maxTAfold<5){s.push('トランスアミナーゼ上昇は軽度');sc+=1;}
+   return {sup:s,ag:a,score:sc,workup:'血液培養・感染源検索、敗血症の臨床経過との対応。ビリルビン優位の胆汁うっ滞が特徴'};
+ }},
+ {nm:'うっ血性肝障害（右心不全・うっ血肝）', cat:'混合/胆汁うっ滞', pat:['mix','chol','hep'], icu:true, eval:m=>{
+   const s=[],a=[]; let sc=0;
+   if(m.tbilHi){s.push('ビリルビン上昇が前景に立つ');sc+=2;}
+   if(m.maxTAfold!=null&&m.maxTAfold<5){s.push('トランスアミナーゼ上昇は軽度のことが多い');sc+=1;}
+   if(m.hi('alp')||m.hi('ggt')){s.push('胆道系酵素の軽度上昇を伴いうる');sc+=1;}
+   return {sup:s,ag:a,score:sc,workup:'右心不全・三尖弁逆流・心タンポナーデ・高CVP・ECMOの評価、心エコー。急性の循環破綻では虚血性肝炎を合併しうる'};
+ }},
+ {nm:'静脈栄養（TPN）関連胆汁うっ滞', cat:'胆汁うっ滞', pat:['chol','mix'], icu:true, eval:m=>{
+   const s=[],a=[]; let sc=0;
+   if(m.tbilHi&&m.dirFrac!=null&&m.dirFrac>0.4){s.push('抱合型優位の高ビリルビン血症');sc+=1;}
+   if(m.hi('alp')||m.hi('ggt')){s.push('胆道系酵素の上昇');sc+=1;}
+   return {sup:s,ag:a,score:sc,workup:'完全静脈栄養の期間・組成（脂肪乳剤）、長期絶食で増加。経腸栄養への移行を検討'};
+ }},
+ {nm:'重症患者の二次性硬化性胆管炎（SSC-CIP）', cat:'胆汁うっ滞', pat:['chol','mix'], icu:true, eval:m=>{
+   const s=[],a=[]; let sc=0;
+   if(m.alpF!=null&&m.alpF>2){s.push('ALP高度上昇');sc+=2;}
+   if(m.hi('ggt')){s.push('γ-GTP上昇');sc+=1;}
+   if(m.tbilHi){s.push('進行性の胆汁うっ滞・黄疸');sc+=1;}
+   return {sup:s,ag:a,score:sc,workup:'長期ICU滞在・人工呼吸・重症ショック/ARDS後に発症する遷延性胆汁うっ滞。MRCP/ERCPで胆管像を評価'};
+ }},
+ {nm:'横紋筋融解（AST上昇の肝外要因）', cat:'肝外/解釈注意', pat:['hep','mix','none','chol','bili'], icu:true, eval:m=>{
+   const s=[],a=[]; let sc=0;
+   if(m.ckHi&&m.ckF!=null&&m.ckF>5){s.push('CK著明上昇');sc+=2;}
+   else if(m.ckHi){s.push('CK上昇');sc+=1;}
+   if(m.deRitis!=null&&m.deRitis>1&&m.ckHi){s.push('AST>ALT（ASTは筋由来でも上昇）');sc+=1;}
+   if(m.ckHi&&!m.hi('alp')&&!m.hi('ggt')){s.push('胆道系酵素は正常');sc+=1;}
+   return {sup:s,ag:a,score:sc,workup:'⚠ ASTは肝特異的でない。CK高値では筋・心由来を考慮。ミオグロビン・腎機能・電解質を確認'};
+ }},
 ];
 
 const PAT_INFO = {
@@ -476,6 +565,8 @@ const DRUGS = [
  {nm:'抗甲状腺薬', en:'antithyroid', alias:['プロピルチオウラシル','PTU','チアマゾール','メルカゾール','propylthiouracil','thiamazole'], use:'甲状腺', pat:['hep','chol'], note:'PTUは肝細胞型、チアマゾールは胆汁うっ滞型が多い'},
  {nm:'アザチオプリン', en:'azathioprine', alias:['イムラン','アザニン'], use:'免疫抑制', pat:['chol','mix'], note:'胆汁うっ滞・類洞閉塞症候群'},
  {nm:'チクロピジン', en:'ticlopidine', alias:['パナルジン'], use:'抗血小板', pat:['chol','mix'], note:'胆汁うっ滞型'},
+ {nm:'プロポフォール', en:'propofol', alias:['ディプリバン','propofol'], use:'鎮静（ICU）', pat:['hep','mix'], note:'高用量・長時間でプロポフォール注入症候群（PRIS）：代謝性アシドーシス・横紋筋融解・肝障害。CK・乳酸も確認'},
+ {nm:'静脈栄養（TPN）/脂肪乳剤', en:'parenteral nutrition', alias:['TPN','イントラリポス','脂肪乳剤','高カロリー輸液','intralipid'], use:'静脈栄養（ICU）', pat:['chol','mix'], note:'長期の完全静脈栄養で胆汁うっ滞（抱合型ビリルビン上昇）。経腸栄養への移行を検討'},
  {nm:'漢方・健康食品・サプリメント', en:'herbal supplement', alias:['漢方','サプリ','サプリメント','健康食品','プロテイン','緑茶抽出物','ウコン','turmeric','kava','supplement','herbal'], use:'健康食品等', pat:['hep','mix','chol'], note:'見落とされやすい重要な原因。ウコン等でも報告あり。必ず聴取する'},
 ];
 const PAT_LABEL={hep:'肝細胞障害型', chol:'胆汁うっ滞型', mix:'混合型'};
@@ -547,15 +638,59 @@ function renderDILI(m){
   return h;
 }
 
+// ===== 臨床所見（病歴・症状・身体所見）。各所見が対応疾患のスコアを補正 =====
+const FINDINGS = [
+ // 病歴・背景
+ {id:'alcohol', g:'hx', label:'習慣的な過量飲酒', sup:[{dx:'アルコール性肝障害',w:3,txt:'過量飲酒歴'},{dx:'肝硬変（非代償性を含む）',w:1,txt:'過量飲酒歴'}]},
+ {id:'newdrug', g:'hx', label:'新規の薬剤・サプリ開始', sup:[{dx:'薬物性肝障害（DILI）',w:2,txt:'新規薬剤・サプリの開始歴'}]},
+ {id:'metabolic', g:'hx', label:'肥満・糖尿病・脂質異常', sup:[{dx:'NAFLD / NASH（脂肪性肝疾患）',w:2,txt:'代謝危険因子（肥満・糖尿病・脂質異常）'}]},
+ {id:'viralrisk', g:'hx', label:'輸血・刺青・薬物注射・性的曝露', sup:[{dx:'慢性肝炎（B/C型・その他）',w:2,txt:'肝炎ウイルス感染リスク'},{dx:'急性ウイルス性肝炎',w:1,txt:'感染リスク歴'}]},
+ {id:'travel_food', g:'hx', label:'海外渡航・生水/生肉摂取', sup:[{dx:'急性ウイルス性肝炎',w:1,txt:'A型/E型を示唆する曝露歴'}]},
+ {id:'ibd', g:'hx', label:'炎症性腸疾患の合併', sup:[{dx:'原発性硬化性胆管炎（PSC）',w:3,txt:'IBDの合併'}]},
+ {id:'autoimmune_hx', g:'hx', label:'自己免疫疾患の既往', sup:[{dx:'自己免疫性肝炎（AIH）',w:2,txt:'自己免疫疾患の併存'},{dx:'原発性胆汁性胆管炎（PBC）',w:1,txt:'自己免疫の背景'}]},
+ {id:'shock', g:'hx', label:'ショック・心停止・高度低血圧', sup:[{dx:'虚血性肝炎（低酸素性肝炎・ショック肝）',w:3,txt:'循環不全のエピソード'}]},
+ {id:'heartfailure', g:'hx', icu:true, label:'心不全・高CVP・三尖弁逆流', sup:[{dx:'うっ血性肝障害（右心不全・うっ血肝）',w:3,txt:'右心不全/うっ血の所見'}]},
+ {id:'sepsis', g:'hx', icu:true, label:'敗血症・重症感染症', sup:[{dx:'敗血症関連胆汁うっ滞',w:3,txt:'敗血症の臨床経過'}]},
+ {id:'tpn', g:'hx', icu:true, label:'長期静脈栄養・絶食', sup:[{dx:'静脈栄養（TPN）関連胆汁うっ滞',w:3,txt:'長期TPN/絶食'}]},
+ {id:'prolongedicu', g:'hx', icu:true, label:'長期ICU・人工呼吸（ARDS後）', sup:[{dx:'重症患者の二次性硬化性胆管炎（SSC-CIP）',w:3,txt:'長期重症管理後の経過'}]},
+ // 症状・身体所見
+ {id:'fever', g:'sx', label:'発熱', sup:[{dx:'急性胆管炎',w:2,txt:'発熱'},{dx:'薬物性肝障害（DILI）',w:1,txt:'発熱（過敏機序を示唆）'}]},
+ {id:'rash_eos', g:'sx', label:'発疹・好酸球増多', sup:[{dx:'薬物性肝障害（DILI）',w:2,txt:'発疹・好酸球増多（薬剤過敏を示唆）'}]},
+ {id:'pruritus', g:'sx', label:'掻痒', sup:[{dx:'原発性胆汁性胆管炎（PBC）',w:2,txt:'掻痒'},{dx:'肝外胆道閉塞（結石・腫瘍）',w:1,txt:'胆汁うっ滞による掻痒'}]},
+ {id:'ruq_pain', g:'sx', label:'右季肋部痛', sup:[{dx:'肝外胆道閉塞（結石・腫瘍）',w:2,txt:'右季肋部痛'},{dx:'急性胆管炎',w:2,txt:'右季肋部痛'}]},
+ {id:'charcot', g:'sx', label:'Charcot三徴（発熱+黄疸+右上腹部痛）', sup:[{dx:'急性胆管炎',w:4,txt:'Charcot三徴'}]},
+ {id:'weightloss', g:'sx', label:'体重減少', sup:[{dx:'肝外胆道閉塞（結石・腫瘍）',w:1,txt:'体重減少（悪性閉塞を示唆）'}]},
+ {id:'ascites', g:'sx', label:'腹水', sup:[{dx:'肝硬変（非代償性を含む）',w:2,txt:'腹水'}]},
+ {id:'stigmata', g:'sx', label:'慢性肝疾患の身体所見（クモ状血管腫・手掌紅斑等）', sup:[{dx:'肝硬変（非代償性を含む）',w:3,txt:'慢性肝疾患の身体所見'}]},
+ {id:'splenomegaly', g:'sx', label:'脾腫', sup:[{dx:'肝硬変（非代償性を含む）',w:2,txt:'脾腫（門脈圧亢進）'}]},
+ {id:'encephalopathy', g:'sx', label:'肝性脳症・羽ばたき振戦', sup:[{dx:'急性肝不全（劇症化）',w:3,txt:'肝性脳症'},{dx:'肝硬変（非代償性を含む）',w:1,txt:'脳症（非代償）'}]},
+ {id:'edema_jvd', g:'sx', icu:true, label:'浮腫・頸静脈怒張', sup:[{dx:'うっ血性肝障害（右心不全・うっ血肝）',w:2,txt:'うっ血所見（浮腫・頸静脈怒張）'}]},
+];
+function buildFindings(){
+  ['hx','sx'].forEach(g=>{
+    const c=document.getElementById(g==='hx'?'findHx':'findSx'); if(!c)return; c.innerHTML='';
+    FINDINGS.filter(f=>f.g===g && (!f.icu||ICU.on)).forEach(f=>{
+      const b=document.createElement('span'); b.className='find-chip'+(FIND.has(f.id)?' on':'');
+      b.textContent=f.label; b.dataset.id=f.id;
+      b.onclick=()=>{ if(FIND.has(f.id))FIND.delete(f.id); else FIND.add(f.id); b.classList.toggle('on'); run(); };
+      c.appendChild(b);
+    });
+  });
+}
+
 // ===== 実行 =====
 function run(){
   const v=readVals();
-  if(Object.values(v).every(x=>x===null)){ return; }
+  if(Object.values(v).every(x=>x===null) && FIND.size===0){ return; }
   const m=metrics(v);
+  const fc={};
+  FINDINGS.forEach(f=>{ if(FIND.has(f.id)) f.sup.forEach(s=>{ (fc[s.dx]=fc[s.dx]||[]).push(s); }); });
   const matched=[];
   DISEASES.forEach(d=>{
+    if(d.icu && !ICU.on) return;
     if(!d.pat.includes(m.pattern)) return;
     const r=d.eval(m);
+    (fc[d.nm]||[]).forEach(s=>{ r.sup.push(s.txt); r.score+=s.w; });
     if(r.score>0) matched.push({d,r});
   });
   matched.sort((a,b)=>b.r.score-a.r.score);
@@ -568,8 +703,26 @@ function render(m,matched){
   let html='';
 
   // 重症フラグ
-  if(m.highINR || (m.tbilHi&&m.v.tbil>10)){
-    html+=`<div class="flagbox crit"><span class="fi">🚨</span><div><b>重症化のサイン:</b> ${m.highINR?'PT-INR≧1.5（合成能低下）':''}${m.highINR&&m.tbilHi&&m.v.tbil>10?'・':''}${m.tbilHi&&m.v.tbil>10?'著明な高ビリルビン血症':''} を認めます。急性肝不全の可能性を念頭に、凝固能・意識状態を緊急評価し専門医への相談を検討してください。</div></div>`;
+  const critSig=[];
+  if(m.highINR) critSig.push('PT-INR≧1.5（合成能低下）');
+  if(m.tbilHi&&m.v.tbil>10) critSig.push('著明な高ビリルビン血症');
+  if(FIND.has('encephalopathy')) critSig.push('肝性脳症');
+  if(critSig.length){
+    html+=`<div class="flagbox crit"><span class="fi">🚨</span><div><b>重症化のサイン:</b> ${critSig.join('・')} を認めます。急性肝不全の可能性を念頭に、凝固能・意識状態を緊急評価し専門医への相談を検討してください。</div></div>`;
+  }
+  if(FIND.has('charcot')){
+    html+=`<div class="flagbox crit"><span class="fi">🚨</span><div><b>急性胆管炎の疑い:</b> Charcot三徴（発熱・黄疸・右上腹部痛）を認めます。閉塞性化膿性胆管炎は致死的となりうるため、血液培養・画像評価とともに緊急の胆道ドレナージ（ERCP/PTCD）を検討してください。</div></div>`;
+  }
+
+  if(ICU.on){
+    html+=`<div class="flagbox info"><span class="fi">🛈</span><div><b>ICUモード：検査値の解釈に注意</b>
+      <ul>
+        <li>アルブミン低下 ＝ 肝合成能低下とは限らない（急性期反応・希釈・血管透過性亢進）</li>
+        <li>PT-INR延長は抗凝固薬・ビタミンK欠乏・DIC・消費でも起こる（第V因子・フィブリノゲンも考慮）</li>
+        <li>血小板低下は敗血症・DIC・薬剤（HIT）・希釈など多因子（門脈圧亢進と即断しない）</li>
+        <li>ASTは肝特異的でない（筋・心・溶血由来）。CK・LDHと併せて評価</li>
+        <li>単回値より経時変化が重要（虚血性肝炎は急峻な上昇と下降を示す）</li>
+      </ul></div></div>`;
   }
 
   // パターンバナー
@@ -618,12 +771,14 @@ const PRESETS={
   'PBC':{ast:55,alt:48,alp:380,ggt:340,tbil:1.0,dbil:0.3,alb:4.1,ptinr:1.0,plt:22},
   'Gilbert症候群':{ast:22,alt:20,alp:80,ggt:25,tbil:2.4,dbil:0.3,alb:4.4,ptinr:1.0,plt:25},
   '肝硬変(非代償)':{ast:75,alt:55,alp:150,ggt:90,tbil:3.5,dbil:2.0,alb:2.8,ptinr:1.6,plt:8},
+  'ショック肝(ICU)':{_icu:1, ast:5200,alt:3800,alp:130,ggt:65,tbil:2.2,dbil:1.4,alb:2.8,ptinr:1.9,plt:9,ldh:4000,ck:1100},
+  '敗血症性胆汁うっ滞(ICU)':{_icu:1, ast:60,alt:70,alp:230,ggt:180,tbil:6.8,dbil:5.2,alb:2.5,ptinr:1.3,plt:8,ldh:300,ck:80},
 };
 function buildPresets(){
   const c=document.getElementById('presetChips');
   Object.keys(PRESETS).forEach(k=>{
     const b=document.createElement('button'); b.className='chip'; b.textContent=k;
-    b.onclick=()=>{ loadPreset(PRESETS[k]); run(); };
+    b.onclick=()=>{ if(PRESETS[k]._icu)setICU(true); loadPreset(PRESETS[k]); run(); };
     c.appendChild(b);
   });
 }
@@ -634,16 +789,25 @@ function loadPreset(p){
 function clearAll(){
   ITEMS.forEach(it=>{ const el=document.getElementById('in_'+it.key); el.value=''; el.classList.remove('flag-hi','flag-lo'); });
   meds=[]; renderMeds();
+  FIND.clear(); buildFindings();
   document.getElementById('results').innerHTML=`<div class="empty">
     <svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M9 3h6l1 4-2 2v5l3 6H7l3-6V9L8 7z"/></svg>
     <div>検査値を入力して<br><b style="color:var(--ink-soft)">「鑑別する」</b>を押してください</div></div>`;
 }
 
 // ===== 初期化 =====
-buildInputs(); buildPresets(); buildDrugList();
+buildInputs(); buildPresets(); buildDrugList(); buildFindings();
 document.getElementById('runBtn').onclick=run;
 document.getElementById('addMed').onclick=addMedFromInput;
 document.getElementById('medInput').addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.stopPropagation(); addMedFromInput(); } });
+function setICU(on){
+  ICU.on=on;
+  document.getElementById('icuChk').checked=on;
+  document.getElementById('grpIcuWrap').style.display=on?'block':'none';
+  document.getElementById('inputPanel').classList.toggle('icu-on',on);
+  buildFindings();
+}
+document.getElementById('icuChk').onchange=e=>{ setICU(e.target.checked); run(); };
 document.getElementById('clearBtn').onclick=clearAll;
 document.querySelectorAll('#sexSeg button').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('#sexSeg button').forEach(x=>x.classList.remove('on'));
